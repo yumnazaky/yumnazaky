@@ -1,0 +1,76 @@
+import sys
+import os 
+import math
+
+
+# get the current directory
+current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# get the directory of GUI (which is in a sibling folder)
+GUI_path = os.path.join(current_dir, "gui")
+module_path = os.path.join(current_dir,"modules")# add GUI path to the system path
+sys.path.append(GUI_path) 
+sys.path.append(module_path)
+
+from PyQt5.QtCore import pyqtSignal
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QWidget
+from update_databases import update_lists
+from define_object_classes import ItemObject, SystemStateObject, PhaseObject, ProcedureStepObject
+from Database1 import Database, Item, Phase, ProcedureStep
+from warning_widget import Ui_warningContainer
+class warningContainer(QWidget,Ui_warningContainer ):
+    
+    system_id = math.nan
+    system_name = "none"
+    missing_list = []
+
+    def __init__(self, PhaseName, PSON, IDList, parent=None):
+        # Call the constructor of the parent class.
+        super(warningContainer, self).__init__(parent)
+        # Call the setupUi method to set up the user interface of the widget.
+        self.setupUi(self)
+
+        # Initialize variables
+        self.phase_name = PhaseName  # The name of the procedure
+        self.procedure_step_order_number = PSON         # The step order number
+        self.system_id_list = IDList         # List of system IDs (or names)
+
+        self.missing_list = []
+
+        # Loop through the system IDs and retrieve system names from the Item class
+        for system_id in self.system_id_list:
+            # Query the database for the system using the Item class
+            system_item = self.get_item_by_id(system_id)
+            if system_item:
+                name = system_item.name  # Assuming system_item.name is the system's name
+                self.missing_list.append(name)
+
+        # Set the UI labels with the provided data
+        self.orderNoLabel.setText(str(self.procedure_step_order_number))  # Set the step order number
+        self.inFlightPhaselabel.setText(self.phase_name)        # Set the procedure name
+        self.missingSystemsLabel.setText("\n".join(self.missing_list))     # Display the system names
+
+    def get_item_by_id(self, system_id):
+        """
+        Query the Item table to retrieve the system by ID.
+        This function assumes you're using SQLAlchemy to manage your database.
+        """
+        session = Database.get_session()
+        try:
+            # Query the Item table to find the system by its ID
+            item = session.query(Item).filter_by(id=system_id).first()
+            return item
+        except Exception as e:
+            print(f"Error retrieving item by ID {system_id}: {e}")
+            return None
+        finally:
+            session.close()
+    if __name__ == "__main__":
+        import sys
+        app = QtWidgets.QApplication(sys.argv)
+        warningContainer = QtWidgets.QWidget()
+        ui = Ui_warningContainer()
+        ui.setupUi(warningContainer)
+        warningContainer.show()
+        sys.exit(app.exec_())        
+

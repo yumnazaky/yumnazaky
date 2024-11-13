@@ -1,0 +1,16 @@
+<RCC version="1.0">
+  <qresource>
+    <file alias="add_blue">resources/icon_images/add_blue.jpeg</file>
+    <file alias="change_log">resources/icon_images/change_log.png</file>
+    <file alias="check_mark">resources/icon_images/check_mark.png</file>
+    <file alias="cogwheel">resources/icon_images/cogwheel.png</file>
+    <file alias="cross">resources/icon_images/cross.png</file>
+    <file alias="download_blue">resources/icon_images/download_bluee.png</file>
+    <file alias="pen">resources/icon_images/pen.png</file>
+    <file alias="reload_whiteblue">resources/icon_images/reloadwhiteblue.jpeg</file>
+    <file alias="trash_blue">resources/icon_images/trash_blue.png</file>
+    <file alias="down_blue">resources/icon_images/down_blue.png</file>
+    <file alias="up_blue">resources/icon_images/up_blue.png</file>
+    <file alias="warning">resources/icon_images/warning.png</file>
+  </qresource>
+</RCC>

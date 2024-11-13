@@ -1,0 +1,75 @@
+from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtWidgets import QDialog, QMessageBox, QVBoxLayout, QLabel
+from PyQt5 import QtWidgets
+from new_step import newSte
+import math
+
+class newStepDialog(QDialog, Ui_newStep_dialog):
+    valid_flag = False  # To check the validity of the entered data
+    phase_list = []
+    type_of_operation_list = []
+    system_state_list = []
+    item_list = []
+    procedure_list = []
+    phase_list = []
+    procedure_step_list = []
+    checkpoint_list = []
+    item_id = math.nan
+    change_signal_phase = QtCore.pyqtSignal()
+
+    def __init__(self, parent=None):
+        super(newStepDialog, self).__init__(parent)
+        # Call setupUi to initialize the dialog UI
+        self.setupUi(self)
+
+        # Add some test flight phases to the combo box
+        self.flightPhase_select.addItem("Test Flight Phase 1", 1)
+        self.flightPhase_select.addItem("Test Flight Phase 2", 2)
+
+        # Connect combo box selection
+        self.flightPhase_select.currentIndexChanged.connect(self.on_flight_phase_selected)
+
+        # Add print statements for debugging
+        print("Dialog initialized")
+
+        # Set up the button box functionality
+        self.buttonBox_new_step.accepted.connect(self.save_new_step_data)
+        self.buttonBox_new_step.rejected.connect(self.reject)
+
+        # Connect system button to the dialog
+        self.pushButton_systems.clicked.connect(self.open_system_dialog)
+
+        # Example connection to other widgets
+        self.new_object.textChanged.connect(self.validate_fields)
+
+    def on_flight_phase_selected(self):
+        """Trigger when a flight phase is selected from the combo box."""
+        selected_phase = self.flightPhase_select.currentText()
+        print(f"Selected flight phase: {selected_phase}")
+
+    def save_new_step_data(self):
+        """Save step data when OK button is pressed."""
+        print("Save button clicked")
+
+        object_name = self.new_object.text().strip()
+        action_name = self.action_new.text().strip()
+        print(f"Object Name: {object_name}, Action: {action_name}")
+
+        # Add your data validation and saving logic here
+        QMessageBox.information(self, "Save", "Step data has been saved")
+
+    def validate_fields(self):
+        """Validate fields and give visual feedback."""
+        print("Validating fields")
+        if not self.new_object.text().strip():
+            self.new_object.setStyleSheet("border: 2px solid red;")
+        else:
+            self.new_object.setStyleSheet("")
+
+    def open_system_dialog(self):
+        """Open the system dialog when system button is clicked."""
+        print("Opening system dialog...")
+
+        dialog = DialogSystem(self)
+        dialog.exec_()
+        print("System dialog closed.")
