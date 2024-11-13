@@ -35,7 +35,7 @@ class TypeOfOperationDialog(QDialog, Ui_TypeOfOperationDialog):
     def __init__(self, PSI, parent=None):
         super(TypeOfOperationDialog, self).__init__(parent)
         self.setupUi(self)
-        os.makedirs(self.databases_dir, exist_ok=True)
+        #os.makedirs(self.databases_dir, exist_ok=True)
         self.fill_operation_combobox(DB_path)
 
         # Connect buttons to corresponding slots

@@ -18,7 +18,7 @@ from Database1 import SystemState   # Replace with actual imports
 from define_object_classes import ItemObject, SystemStateObject, PhaseObject, CheckpointObject, ProcedureStepObject, ProcedureObject, TypeOfOperationObject
 from systems_dialog import Ui_DialogSystem
 from systen_row import Ui_systemsRows
-from update_databases import update_lists 
+#from update_databases import update_lists 
 class DialogSystem(QDialog, Ui_DialogSystem):
     valid_flag = bool  
     item_list = []
@@ -39,7 +39,7 @@ class DialogSystem(QDialog, Ui_DialogSystem):
     systems_selected = pyqtSignal(int, list, list,list)
     change_signal_systems = QtCore.pyqtSignal()
     selection_complete = QtCore.pyqtSignal()
-    def __init__(self,  parent=None,selections=None,item_id=None, phase_id=None, procedure_step_id=None,  instance_id=None):
+    def __init__(self,  parent=None,selections=None,item_id=None, phase_id=None, procedure_step_id=None,  instance_id=None, saved_systems_by_step=None):
         super(DialogSystem, self).__init__(parent)
         self.setupUi(self)
 
@@ -64,13 +64,16 @@ class DialogSystem(QDialog, Ui_DialogSystem):
                 background-color: white;
             }
         """)
+        self.saved_systems_by_step = {}
 
+        self.saved_systems_by_step = saved_systems_by_step if saved_systems_by_step is not None else {}
         self.provides = []
         self.requires = []
         self.turns_off = []
+        self.item_id = item_id if item_id is not None else -1
 
         # Default systems that should always appear
-        self.item_id = item_id if item_id is not None else (ItemObject.item_list[0].id if ItemObject.item_list else -1)
+        #self.item_id = item_id if item_id is not None else (ItemObject.item_list[0].id if ItemObject.item_list else -1)
       
         ItemObject.initialize_default_systems()  # Ensure default systems are loaded once
         self.instance_id = instance_id
@@ -84,7 +87,9 @@ class DialogSystem(QDialog, Ui_DialogSystem):
         self.procedure_step_id = self.procedure_step_id
         self.valid_flag = False
         self.setModal(False)
-        self.saved_systems_by_step.setdefault(self.instance_id, {})
+
+        #saved_systems_by_step = {}
+        #self.saved_systems_by_step.setdefault(self.instance_id, {})
         #if self.procedure_step_id is not None:
             #print(f"Initialized with procedure_step_id: {self.procedure_step_id}")
         #else:
@@ -116,6 +121,7 @@ class DialogSystem(QDialog, Ui_DialogSystem):
     
         # Setup connections for the buttons
         self.pushButton.clicked.connect(self.add_system)
+       
         self.newSystemLineEdit.textChanged.connect(self.activate_new_system_button)
         self.pushButton.setDisabled(True)
         self.buttonBox_system_dialog.accepted.connect(self.accept_button_clicked)
@@ -210,9 +216,9 @@ class DialogSystem(QDialog, Ui_DialogSystem):
         ui.requiresCheckBox.setChecked(bool(requires))
         ui.turnOffCheckBox.setChecked(bool(turns_off))
         # Connect checkboxes to the update functionality in ItemObject
-        ui.ProvidesCheckBox.stateChanged.connect(lambda state: self.checkbox_changed(system_name, 'provides', state, ui))
-        ui.requiresCheckBox.stateChanged.connect(lambda state: self.checkbox_changed(system_name, 'requires', state, ui))
-        ui.turnOffCheckBox.stateChanged.connect(lambda state: self.checkbox_changed(system_name, 'turns_off', state, ui))
+        ui.ProvidesCheckBox.stateChanged.connect(lambda state: self.save_checkbox_state(system_name, 'provides', state == Qt.Checked))
+        ui.requiresCheckBox.stateChanged.connect(lambda state: self.save_checkbox_state(system_name, 'requires', state == Qt.Checked))
+        ui.turnOffCheckBox.stateChanged.connect(lambda state: self.save_checkbox_state(system_name, 'turns_off', state == Qt.Checked))
 
         ui.deleteButton.clicked.connect(
             lambda: self.delete_system_row(systemsRows, system_name)
@@ -268,7 +274,12 @@ class DialogSystem(QDialog, Ui_DialogSystem):
             self.update_selection_list(item.turns_off, system_name, is_checked)
 
         print(f"Updated item - ID: {item.id}, Name: {item.name}, Provides: {item.provides}, Requires: {item.requires}, Turns Off: {item.turns_off}")
+        ItemObject.edit_item(
+            item.id, item.name, item.state_list, item.input_param, item.output_param,
+            item.provides, item.requires, item.turns_off
+        )
 
+        print(f"Updated item - ID: {item.id}, Name: {item.name}, Provides: {item.provides}, Requires: {item.requires}, Turns Off: {item.turns_off}")
    
     def enforce_single_selection(self, ui, selected_checkbox):
    
@@ -285,28 +296,7 @@ class DialogSystem(QDialog, Ui_DialogSystem):
                 ui.ProvidesCheckBox.setChecked(False)
                 ui.requiresCheckBox.setChecked(False)    
 
-    def update_system_state(self, system_name, state_type, state):
-     
-        system_item = next((item for item in ItemObject.item_list if item.name == system_name), None)
-        if system_item:
-            system_id = system_item.id
-        # Fetch the item by ID using the return_item method
-            item = ItemObject.return_item(system_id)
-            if item:
-                if state_type == "Provides":
-                    item.provides = "Provides" if state == Qt.Checked else ""
-                elif state_type == "Requires":
-                    item.requires = "Requires" if state == Qt.Checked else ""
-                elif state_type == "Turns Off":
-                    item.turns_off = "Turns Off" if state == Qt.Checked else ""
-
-            
-                print(f"System '{system_name}' updated: {state_type} set to {system_item.provides or system_item.requires or system_item.turns_off}")
-            else:
-                print(f"System with ID '{system_id}' not found.")
-        else:
-            print(f"Warning: System '{system_name}' not found in ItemObject.item_list.")
-
+  
             
 
     def delete_system_row(self, system_row_widget, system_name):
@@ -327,6 +317,13 @@ class DialogSystem(QDialog, Ui_DialogSystem):
 
         
         self.change_signal_systems.emit()
+    def on_system_selected(self, selected_item_id):
+        """This function assigns the selected item_id from the system dialog."""
+        self.item_id = selected_item_id
+        print(f"User-selected item_id {self.item_id} assigned to procedure step.")
+        if self.procedure_step:
+            self.procedure_step.item_id = selected_item_id
+            print(f"Procedure step item_id set to {selected_item_id}")
 
     def activate_new_system_button(self):
         #Enable the Add System button when the input field has text
@@ -334,6 +331,16 @@ class DialogSystem(QDialog, Ui_DialogSystem):
             self.pushButton.setEnabled(True)
         else:
             self.pushButton.setDisabled(True)
+    def update_system_state(self, item_id, provides, requires, turns_off):
+        """Updates system state for a specific instance_id and item_id."""
+        if self.instance_id not in self.saved_systems_by_step:
+            self.saved_systems_by_step[self.instance_id] = {}
+
+        self.saved_systems_by_step[self.instance_id][item_id] = {
+            "provides": provides,
+            "requires": requires,
+            "turns_off": turns_off
+        }        
     def update_checkboxes(self):
         """Update the checkbox states in the scroll area based on saved selections."""
         for i in range(self.verticalLayout_2.count()):
@@ -359,32 +366,40 @@ class DialogSystem(QDialog, Ui_DialogSystem):
         #self.accept_button_clicked()
         #super().closeEvent(event)
     
-    def load_saved_selections(self, instance_id): 
-        #self.provides_list.clear()
-        #self.requires_list.clear()
-        #self.turns_off_list.clear()
-        item = ItemObject.return_item(self.item_id)
-        if item:
-            provides = item.provides
-            requires = item.requires
-            turns_off = item.turns_off
-        else:
-            print(f"No item found with ID {self.item_id} for loading selections.")    
+    def load_saved_selections(self, instance_id):
+    
+        saved_data = self.saved_systems_by_step.get(instance_id, {})
+        if not saved_data:
+            print(f"No saved data found for instance_id: {instance_id}")
+            return
+    
+        self.provides = saved_data.get("provides", [])
+        self.requires = saved_data.get("requires", [])
+        self.turns_off = saved_data.get("turns_off", [])
+    
+    # Update the checkboxes based on saved data
+        self.update_checkboxes()
+        print(f"Selections loaded for instance_id {instance_id}: Provides: {self.provides}, Requires: {self.requires}, Turns Off: {self.turns_off}")
 
+
+    def update_checkboxes_for_item(self, item_id, provides, requires, turns_off):
+    
         for i in range(self.verticalLayout_2.count()):
             widget = self.verticalLayout_2.itemAt(i).widget()
             if widget:
+            # Find the system label in the widget to match the item
                 label = widget.findChild(QtWidgets.QLabel)
                 system_name = label.text() if label else None
-                if system_name:
-                    # Retrieve saved state for this system
-                    #selection_state = self.saved_systems_by_step[self.instance_id].get(system_name, {"provides": False, "requires": False, "turns_off": False})
-                    if system_name:
-                        widget.findChild(QCheckBox, "ProvidesCheckBox").setChecked(system_name in self.provides)
-                        widget.findChild(QCheckBox, "requiresCheckBox").setChecked(system_name in self.requires)
-                        widget.findChild(QCheckBox, "turnOffCheckBox").setChecked(system_name in self.turns_off)
-        print(f"Selections loaded for instance_id {self.instance_id}")
-                    
+            
+            # If the item name matches the label, update checkboxes accordingly
+                if system_name and any(item.name == system_name for item in ItemObject.item_list if item.id == item_id):
+                    widget.findChild(QCheckBox, "ProvidesCheckBox").setChecked(system_name in provides)
+                    widget.findChild(QCheckBox, "requiresCheckBox").setChecked(system_name in requires)
+                    widget.findChild(QCheckBox, "turnOffCheckBox").setChecked(system_name in turns_off)
+                
+                    print(f"Updated checkboxes for item_id {item_id}: Provides: {provides}, Requires: {requires}, Turns Off: {turns_off}")
+                    break  # Exit once the item is found and updated
+              
                 
     def accept_button_clicked(self):
         provides = []
@@ -406,6 +421,7 @@ class DialogSystem(QDialog, Ui_DialogSystem):
 
     # Save selections in memory and database
         self.saved_systems_by_step[self.instance_id] = {
+            "item_id": self.item_id,
             "provides": provides,
             "requires": requires,
             "turns_off": turns_off
@@ -419,7 +435,7 @@ class DialogSystem(QDialog, Ui_DialogSystem):
                 item.id, item.name, item.state_list, item.input_param, item.output_param,
                 provides, requires, turns_off
             )
-        
+        self.systems_selected.emit(self.item_id, provides, requires, turns_off)
         print(f"Selections saved for instance_id {self.instance_id}: Provides: {provides}, Requires: {requires}, Turns Off: {turns_off}")
         self.accept()
     

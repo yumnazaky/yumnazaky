@@ -13,6 +13,7 @@ from prettytable import PrettyTable
 import json 
 import time
 
+
 class ItemObject:
     item_list = []
     _defaults_initialized = False
@@ -183,9 +184,10 @@ class ItemObject:
             item.output_param = output_param
         
         # Ensure provides, requires, and turns_off are stored as comma-separated strings
-            item.provides = provides if isinstance(provides, list) else json.loads(provides)
-            item.requires = requires if isinstance(requires, list) else json.loads(requires)
-            item.turns_off = turns_off if isinstance(turns_off, list) else json.loads(turns_off)
+            item.provides = provides[:] if isinstance(provides, list) else json.loads(provides)
+            item.requires = requires[:] if isinstance(requires, list) else json.loads(requires)
+            item.turns_off = turns_off[:] if isinstance(turns_off, list) else json.loads(turns_off)
+
         
         # Debug statement to confirm updates
             print(f"Updated item - ID: {item.id}, Name: {item.name}, Provides: {item.provides}, Requires: {item.requires}, Turns Off: {item.turns_off}")

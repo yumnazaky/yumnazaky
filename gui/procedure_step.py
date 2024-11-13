@@ -57,6 +57,8 @@ class FlightPhaseStep(QtWidgets.QWidget):
     move_down_signal = QtCore.pyqtSignal(int) 
     refresh_layout_signal = pyqtSignal()# Signal for notifying changes
     selection_complete = QtCore.pyqtSignal()
+    saved_systems_signal = pyqtSignal(dict)
+
     def __init__(self,  procedure_step_id=None, phase_id=None,parent=None):
         super(FlightPhaseStep, self).__init__(parent)
         print("ItemObject.item_list:", [(item.id, item.name) for item in ItemObject.item_list])
@@ -64,8 +66,9 @@ class FlightPhaseStep(QtWidgets.QWidget):
         print(f"Initializing FlightPhaseStep for procedure_step_id: {procedure_step_id}")
         #print("ProcedureStep widget created with:", procedure_step)
         # Set up the UI from the Ui_FlightPhaseStep class (no multiple inheritance)
-        if not hasattr(self, 'saved_systems_by_step'):
-            self.saved_systems_by_step = {}
+        #if not hasattr(self, 'saved_systems_by_step'):
+            #self.saved_systems_by_step = {}
+        self.saved_systems_by_step = {}    
         self.ui = Ui_FlightPhaseStep()
         self.ui.setupUi(self)
         #ItemObject.initialize_default_systems() 
@@ -93,7 +96,6 @@ class FlightPhaseStep(QtWidgets.QWidget):
 
          # Initialize if empty
 
-        
         
         #if self.item_id:
             #self.item = ItemObject.return_item(self.item_id)
@@ -250,28 +252,24 @@ class FlightPhaseStep(QtWidgets.QWidget):
         if self.procedure_step.order_step != str(self.ui.procedureStep_order.text()):
             changes.append(f"Changed order_step from '{self.procedure_step.order_step}' to '{str(self.ui.procedureStep_order.text())}'")
             self.procedure_step.order_step = str(self.ui.procedureStep_order.text())   
-
+        if isinstance(self.procedure_step.change_history, str):
+            try:
+                self.procedure_step.change_history = json.loads(self.procedure_step.change_history)
+            except json.JSONDecodeError:
+                print("Error decoding change_history JSON; initializing with an empty list.")
+                self.procedure_step.change_history = []
     # Continue checking other fields similarly...
         physical_features_json = json.dumps(self.procedure_step.physical_features)
-        change_history_json = json.dumps(self.procedure_step.change_history)
+        #change_history_json = json.dumps(self.procedure_step.change_history)
     # If there are changes, add to change history
         if changes:
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             for change in changes:
                 self.procedure_step.change_history.append({"time": timestamp, "change": change})
-
+        change_history_json = json.dumps(self.procedure_step.change_history)
+    
        
-        ItemObject.edit_item(
-            item.id,
-            item.name,
-            item.state_list,
-            item.input_param,
-            item.output_param,
-            provides_list,
-            requires_list,
-            turns_off_list,
-        ) 
         
 
     # Save to the in-memory list and update the database
@@ -294,6 +292,7 @@ class FlightPhaseStep(QtWidgets.QWidget):
         self.update_initial_values()
         self.ui.saveChanges.setEnabled(False)
         self.ui.caancel_changes.setEnabled(False)
+   
 
     def undo_step(self):
         """Revert the step to its initial values."""
@@ -326,12 +325,11 @@ class FlightPhaseStep(QtWidgets.QWidget):
 
         
     def move_procedure_step_up(self):
-        """Emit signal to move step up in the main layout."""
-        self.move_up_signal.emit(self.procedure_step_id)
-
+        self.move_up_signal.emit(self.procedure_step.order_step)
+  
     def move_procedure_step_down(self):
-        """Emit signal to move step down in the main layout."""
-        self.move_down_signal.emit(self.procedure_step_id)
+        self.move_down_signal.emit(self.procedure_step.order_step)
+
     def find_parent_layout(self):
         """Helper method to find and return the parent layout."""
         parent_widget = self.parentWidget()
@@ -393,7 +391,16 @@ class FlightPhaseStep(QtWidgets.QWidget):
 
 
     def open_change_history_dialog(self):
-        """Open the change history dialog for the procedure step."""
+    
+        if isinstance(self.procedure_step.change_history, str):
+            try:
+                self.procedure_step.change_history = json.loads(self.procedure_step.change_history)
+                if not isinstance(self.procedure_step.change_history, list):
+                    raise ValueError("change_history JSON is not a list.")
+            except (json.JSONDecodeError, ValueError):
+                print("Error decoding change_history or unexpected format. Initializing as an empty list.")
+                self.procedure_step.change_history = []
+
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle("Change History")
         layout = QtWidgets.QVBoxLayout(dialog)
@@ -414,59 +421,60 @@ class FlightPhaseStep(QtWidgets.QWidget):
         layout.addWidget(close_button)
 
         dialog.exec_()
+
     def systems_button_clicked(self):
-        if self.item_id == -1:
-            if ItemObject.item_list:
-                self.item_id = ItemObject.item_list[0].id
-                print(f"Assigned default item_id {self.item_id} as fallback.")
-            else:
-                print("Warning: ItemObject.item_list is empty. Cannot assign item_id.")
+        self.update_all_lists() 
+        dialog = DialogSystem(
+            parent=self,
+            item_id=self.item_id,
+            instance_id=(self.phase_id, self.procedure_step_id),
+            saved_systems_by_step=self.saved_systems_by_step
+        )
+        dialog.systems_selected.connect(self.update_systems_selection)  # Connect selection updates
 
-        instance_id = (self.phase_id, self.procedure_step_id)
+    # Load saved selections before showing the dialog
+       
+        dialog.exec_()  # Open dialog as a modal
 
-    # Load saved selections from ItemObject.item_list
-        item = ItemObject.return_item(self.item_id)
-        if item:
-        # Assume provides, requires, and turns_off are lists stored in the item
-            saved_data = {
-                "provides": item.provides,
-                "requires": item.requires,
-                "turns_off": item.turns_off,
-            }
-            self.saved_systems_by_step[self.procedure_step_id] = saved_data
-        else:
-            print(f"No saved data found for item_id {self.item_id}")
 
-    # Open the dialog and pass instance_id and item_id for context
-        dialog = DialogSystem(parent=self, item_id=self.item_id, instance_id=instance_id)
-        dialog.systems_selected.connect(self.update_systems_selection)
-        dialog.exec_()
 
     def update_systems_selection(self, item_id, provides, requires, turns_off):
         print("update_systems_selection called with:", item_id, provides, requires, turns_off)
-
         instance_id = (self.phase_id, self.procedure_step_id)
+        #instance_id = (self.phase_id, self.procedure_step_id)
     
-        self.saved_systems_by_step[instance_id] ={
-            item_id: {
-                "provides": provides[:],
-                "requires": requires[:],
-                "turns_off": turns_off[:],
-            }
+        self.saved_systems_by_step[instance_id] = {
+            "item_id": item_id,
+            "provides": provides,
+            "requires": requires,
+            "turns_off": turns_off
         }
 
-        item = ItemObject.return_item(item_id)
-        if not item:
-            print(f"Warning: No item found with item_id {item_id}.")
-            return
-
-    # Directly update the item properties with isolated data
-        item.provides = provides[:]
-        item.requires = requires[:]
-        item.turns_off = turns_off[:]
-        print(f"Updated item - Provides: {item.provides}, Requires: {item.requires}, Turns Off: {item.turns_off}")
-
         
+
+        procedure_step = ProcedureStepObject.return_procedure_step(self.procedure_step_id)
+        if procedure_step:
+            procedure_step.item_id = item_id
+            procedure_step.provides = provides[:]
+            procedure_step.requires = requires[:]
+            procedure_step.turns_off = turns_off[:]
+        
+            ProcedureStepObject.edit_procedure_step(
+                procedure_step.id,
+                object_name=procedure_step.object_name,
+                order_step=procedure_step.order_step,
+                action=procedure_step.action,
+                executed_by=procedure_step.executed_by,
+                required_input_state=procedure_step.required_input_state,
+                output_state=procedure_step.output_state,
+                physical_features=procedure_step.physical_features,
+                rationale=procedure_step.rationale,
+                comments=procedure_step.comments,
+                change_history=procedure_step.change_history,
+                procedure_id=procedure_step.procedure_id,
+                item_id=item_id
+            )
+        print(f"Selections saved for procedure_step_id {self.procedure_step_id}")
     # Update `saved_systems_by_step` for the specific procedure_step_id and item_id
         
     # Initialize saved_systems_by_step if it doesn't exist

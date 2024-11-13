@@ -8,6 +8,7 @@ import traceback
 import resources_rc
 
 
+
 # get the current directory
 current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # get the directory of GUI (which is in a sibling folder)
@@ -309,10 +310,12 @@ class FlightFlowMainWindow(QMainWindow, Ui_flightFlow_main_window):
     # Populate physical features if they exist
         step_widget.ui.physicalFeatures_param.setPlainText(physical_features.get("parameter", ""))
         step_widget.ui.physicalFeatures_value.setPlainText(physical_features.get("value", ""))
-        step_widget.move_up_signal.connect(lambda: self.move_step_up(procedure_step.id))
-        step_widget.move_down_signal.connect(lambda: self.move_step_down(procedure_step.id))
+        step_widget.move_up_signal.connect(lambda: self.move_step_up(procedure_step.order_step))
+        step_widget.move_down_signal.connect(lambda: self.move_step_down(procedure_step.order_step))
 
+        
         step_widget.update_initial_values()
+
         #step_widget.checkpoint_added.connect(self.add_checkpoint_below_step)
     
         return step_widget
@@ -410,53 +413,44 @@ class FlightFlowMainWindow(QMainWindow, Ui_flightFlow_main_window):
                 widget = item.widget()
                 if widget:
                     widget.deleteLater()    
-    def move_step_up(self, procedure_step_id):
-        """Move the specified procedure step up in the list and refresh layout."""
+    def move_step_up(self, order_step):
+   
         try:
-        # Retrieve type_of_operation_id based on the current tab selection
-            
-
-        # Find index and move up if possible
-            steps = ProcedureStepObject.procedure_step_list
-            index = next((i for i, step in enumerate(steps) if step.id == procedure_step_id), None)
+        # Locate the current step by order and swap with the previous step if possible
+            steps = sorted(ProcedureStepObject.procedure_step_list, key=lambda x: x.order_step)
+            index = next((i for i, step in enumerate(steps) if step.order_step == order_step), None)
 
             if index is not None and index > 0:
-            # Swap order values in the model and update list order
+            # Swap order values
                 steps[index].order_step, steps[index - 1].order_step = steps[index - 1].order_step, steps[index].order_step
-                steps[index], steps[index - 1] = steps[index - 1], steps[index]
-
-            # Refresh the UI immediately
-                self.refresh_step_layout()
-            else:
-                print(f"No movement possible for step ID {procedure_step_id} (index {index})")
-        # Now call populate_warning_view with both arguments
-           
+            # Sort again after updating order
+                ProcedureStepObject.edit_procedure_step(steps[index].id, order_step=steps[index].order_step)
+                ProcedureStepObject.edit_procedure_step(steps[index - 1].id, order_step=steps[index - 1].order_step)
+                self.refresh_step_layout()  # Refresh UI to reflect the change
+            #else:
+                #print(f"No upward movement possible for step at order {order_step} (index {index})")
         except Exception as e:
             print(f"Error in move_step_up: {e}")
 
-    def move_step_down(self, procedure_step_id):
-    
+
+    def move_step_down(self, order_step):
+  
         try:
-        # Retrieve type_of_operation_id based on the current tab selection
-           
-        # Find index and move down if possible
-            steps = ProcedureStepObject.procedure_step_list
-            index = next((i for i, step in enumerate(steps) if step.id == procedure_step_id), None)
+            steps = sorted(ProcedureStepObject.procedure_step_list, key=lambda x: x.order_step)
+            index = next((i for i, step in enumerate(steps) if step.order_step == order_step), None)
 
             if index is not None and index < len(steps) - 1:
-            # Swap order values in the model and update list order
+            # Swap order values
                 steps[index].order_step, steps[index + 1].order_step = steps[index + 1].order_step, steps[index].order_step
-                steps[index], steps[index + 1] = steps[index + 1], steps[index]
-
-            # Refresh the UI immediately
-                self.refresh_step_layout()
-
-        # Now call populate_warning_view with both arguments
-            else:
-                print(f"No movement possible for step ID {procedure_step_id} (index {index})")
-
+            # Sort again after updating order
+                ProcedureStepObject.edit_procedure_step(steps[index].id, order_step=steps[index].order_step)
+                ProcedureStepObject.edit_procedure_step(steps[index + 1].id, order_step=steps[index + 1].order_step)
+                self.refresh_step_layout()  # Refresh UI to reflect the change
+            #else:
+               # print(f"No downward movement possible for step at order {order_step} (index {index})")
         except Exception as e:
             print(f"Error in move_step_down: {e}")
+
 
 
     
@@ -480,29 +474,38 @@ class FlightFlowMainWindow(QMainWindow, Ui_flightFlow_main_window):
         #layout.addSpacerItem(QtWidgets.QSpacerItem(20, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
         # Add a spacer at the end
     def refresh_step_layout(self):
-        """Refreshes the layout to reflect the updated order of step containers."""
+    # Locate the layout for steps
         layout = self.findChild(QVBoxLayout, "verticalLayout_7")
-        if layout is None:
-            print("Error: 'verticalLayout_7' not found.")
+        if not layout:
+            print("Error: Layout 'verticalLayout_7' not found.")
             return
-    
-    # Sort steps by order, then re-add them in the sorted order
-        
-    # Clear the layout only for widgets currently in `layout`
+
+     # Clear existing widgets in the layout
         while layout.count():
             item = layout.takeAt(0)
             widget = item.widget()
             if widget:
-                widget.setParent(None)
+                widget.deleteLater()
 
-    # Re-add widgets in the sorted order based on `order_step`
+    # Re-add each step container in the sorted order of `order_step`
         sorted_steps = sorted(ProcedureStepObject.procedure_step_list, key=lambda x: int(x.order_step))
-        self.create_procedure_steps(len(sorted_steps), sorted_steps)
+        for step in sorted_steps:
+        # Create a container with both step and associated checkpoints
+            step_container = self.step_widget_map.get(step.id)  # Retrieve existing container from the map
+            if step_container:
+                layout.addWidget(step_container) 
+    # Set spacing to bring steps closer together
+        layout.setSpacing(5)  # Adjust spacing as desired
 
-
-    # Add a spacer at the end to keep layout consistent
+    # Add spacer to push all steps to the top
         layout.addSpacerItem(QtWidgets.QSpacerItem(20, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
-       
+
+    # Optionally, call an update function if additional refreshes are required
+        layout.update()
+        
+
+
+
 
     def get_checkpoint_widget(self, procedure_step_widget):
         """Retrieve the checkpoint widget associated with the given procedure step."""
@@ -1253,10 +1256,8 @@ class FlightFlowMainWindow(QMainWindow, Ui_flightFlow_main_window):
         
         # Block signals to avoid recursive calls
             self.flightPhases_tabs.blockSignals(True)
-
-        # Update all in-memory lists from the database
-           
-
+            
+        # Up
         
         # Prevent recursion in add_operation_type
             if not getattr(self, "_reloading_operations", False):

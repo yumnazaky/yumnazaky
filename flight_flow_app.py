@@ -1,6 +1,8 @@
 import sys
 import os
 
+
+
 # Set up paths
 current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GUI_path = os.path.join(current_dir, "gui")
@@ -8,7 +10,9 @@ sys.path.append(GUI_path)
 
 # Import necessary PyQt5 classes
 from PyQt5.QtWidgets import QApplication
-
+app_dir = os.path.dirname(os.path.abspath(__file__))
+# Add the app_dir to the system path
+sys.path.append(app_dir)
 # Import your main window class, which should be the one that integrates Ui_flightFlow_main_window
 from gui.mainwindow_functionalties import FlightFlowMainWindow  # Adjust this path if needed
 

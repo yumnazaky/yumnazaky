@@ -42,7 +42,7 @@ def update_lists():
     SystemStateObject.create_system_state_list()
     PhaseObject.create_phase_list()
     CheckpointObject.create_checkpoint_list()
-
+  
    
     
     procedure_step_list =[]
@@ -59,8 +59,8 @@ def update_lists():
     phase_list = PhaseObject.phase_list
     checkpoint_list = CheckpointObject.checkpoint_list
 
-    initial_item_cache = [(item.id, item.provides, item.requires, item.turns_off) for item in ItemObject.item_list]
-    print("Temporary cache before calling update_lists():", initial_item_cache)
+    #initial_item_cache = [(item.id, item.provides, item.requires, item.turns_off) for item in ItemObject.item_list]
+    #print("Temporary cache before calling update_lists():", initial_item_cache)
     return (
         item_list,
         procedure_list,
@@ -70,15 +70,15 @@ def update_lists():
         phase_list,
         checkpoint_list,
     )
-    updated_item_cache = [(item.id, item.provides, item.requires, item.turns_off) for item in ItemObject.item_list]
+    #updated_item_cache = [(item.id, item.provides, item.requires, item.turns_off) for item in ItemObject.item_list]
     
-    print("Updated cache after calling update_lists():", updated_item_cache)
+    #print("Updated cache after calling update_lists():", updated_item_cache)
 
 
 # Call this before generating warnings for a new step.
 
 def create_requirements_list( type_of_operation_id, selected_procedure_id):
-
+    #ItemObject.item_list.clear()
     #temp_cache = [(item.id, item.provides, item.requires, item.turns_off) for item in ItemObject.item_list]
     #print("Temporary cache before calling update_lists():", temp_cache)
     # Get the updated lists
@@ -92,7 +92,7 @@ def create_requirements_list( type_of_operation_id, selected_procedure_id):
         checkpoint_list,
     ) = update_lists()
     print("Updated ItemObject.item_list before processing in create_requirements_list:")
-    for item in ItemObject.item_list:
+    for item in item_list:
         print(f"Item ID: {item.id}, Name: {item.name}, Provides: {item.provides}, Requires: {item.requires}, Turns Off: {item.turns_off}")
     provided_list = []
     warning_list = []
